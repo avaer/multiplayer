@@ -1,0 +1,342 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>xrpackage | trees</title>
+  <link rel=icon type="image/png" href="favicon.png">
+  <link href="/index.css" rel=stylesheet>
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&display=swap" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/0735724151.js" crossorigin="anonymous"></script>
+</head>
+
+<body class="header-gap">
+  <header class=header id=header>
+    <a href="/" class="nav icon">山</a>
+    <nav class="selector nav bar" id=selector>
+      <i class="fa fa-user head"></i>
+      <div class=header-label id=header-label>Log in</div>
+      <i class="fa fa-chevron-down tail"></i>
+      <div class=selections id=selections>
+        <a href="run.html" class=selection id=run-mode>
+          <i class="fa fa-play"></i>
+          <div class=wrap>
+            <h3>Run mode</h3>
+            <p>Switch to run mode</p>
+          </div>
+        </a>
+        <a href="edit.html" class=selection id=edit-mode>
+          <i class="fa fa-pencil"></i>
+          <div class=wrap>
+            <h3>Edit mode</h3>
+            <p>You are currently editing this world</p>
+          </div>
+        </a>
+        <a href="browse.html" class="selection dim">
+          <i class="fa fa-solar-system"></i>
+          <div class=wrap>
+            <h3>Browse packages</h3>
+            <p>Explore the XRPackage registry</p>
+          </div>
+        </a>
+        <a href="help.html" class=selection>
+          <i class="fa fa-book"></i>
+          <div class=wrap>
+            <h3>Documentation</h3>
+            <p>Learn how to make packages and worlds</p>
+          </div>
+        </a>
+      </div>
+    </nav>
+
+    <form class="login-form phase-1" id=login-form>
+      <div class=phase-content>
+        <div class=login-notice id=login-notice></div>
+        <div class=login-error id=login-error></div>
+      </div>
+      <div class="phase-content phase-1-content">
+        <input type=email placeholder="your@email.com" id=login-email>
+        <input type=submit value="Log in" class="button highlight">
+      </div>
+      <div class="phase-content phase-2-content">
+        <input type=text placeholder="Verification code" id=login-verification-code>
+        <input type=submit value="Verify" class="button highlight">
+      </div>
+      <div class="phase-content phase-3-content">
+        <nav class=user-button id=user-button>
+          <img src="favicon.ico">
+          <span class=name id=login-email-static></span>
+          <input type=submit value="Log out" class="button highlight">
+        </nav>
+      </div>
+      <div class="phase-content phaseless-content">
+        <div>Working...</div>
+      </div>
+    </form>
+  </header>
+
+<script type=module>
+import * as THREE from './three.module.js';
+import {OrbitControls} from './OrbitControls.js';
+import alea from './alea.js';
+import indev from './indev.js';
+import murmur from './murmur.js';
+import {
+  NUM_CELLS,
+  OVERSCAN,
+  NUM_CELLS_OVERSCAN,
+
+  DEFAULT_SEED,
+
+  NUM_CELLS_HEIGHT,
+  HEIGHT_OFFSET,
+
+  RANGE,
+} from './constants.js';
+import * as protocolUtils from './protocol-utils.js';
+import {BufferGeometryUtils} from './BufferGeometryUtils.js';
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.sortObjects = false;
+renderer.physicallyCorrectLights = true;
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 0, 2);
+
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.screenSpacePanning = true;
+orbitControls.enableMiddleZoom = false;
+// orbitControls.update();
+
+const _requestImage = src => new Promise((accept, reject) => {
+  const img = document.createElement('img');
+  img.src = src;
+  img.onload = () => {
+    accept(img);
+  };
+  img.onerror = reject;
+});
+
+Promise.all([
+  _requestImage('./chest-top.png'),
+  _requestImage('./chest-front.png'),
+  _requestImage('./chest-side.png'),
+  _requestImage('./chest-inside.png'),
+])
+.then(imgs => {
+  const canvas = document.createElement('canvas');
+  let totalWidth = 0;
+  let maxHeight = 0;
+  for (const img of imgs) {
+    totalWidth += img.width;
+    maxHeight = Math.max(img.height, maxHeight);
+  }
+  canvas.width = totalWidth;
+  canvas.height = maxHeight;
+  const ctx = canvas.getContext('2d');
+  for (let i = 0; i < imgs.length; i++) {
+    const img = imgs[i];
+    ctx.drawImage(img, i*img.width, 0);
+  }
+
+  let index = 0;
+  const chestTopUvs = [index/imgs.length, 0, ++index/imgs.length, 1];
+  const chestFrontUvs = [index/imgs.length, 0, ++index/imgs.length, 1];
+  const chestSideUvs = [index/imgs.length, 0, ++index/imgs.length, 1];
+  const chestInsideUvs = [index/imgs.length, 0, ++index/imgs.length, 1];
+
+  const NUM_POSITIONS = 10 * 1024;
+
+  const t = new THREE.Texture(canvas);
+  t.needsUpdate = true;
+  const material = new THREE.MeshBasicMaterial({
+    map: t,
+  });
+
+  const chestGeometry = (() => {
+    const baseGeometry = (() => {
+      const geometry = new THREE.BoxBufferGeometry(1, 0.5, 1)
+        .applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.5/2, 0));
+      const uvs = geometry.getAttribute('uv').array;
+      const numUvs = uvs.length / 2;
+      for (let i = 0; i < numUvs; i++) {
+        const faceIndex = i >> 2;
+
+        let chestUvs;
+        if (faceIndex === 0) { // right
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 1) { // left
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 2) { // top
+          chestUvs = chestInsideUvs;
+        } else if (faceIndex === 3) { // bottom
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 4) { // front
+          chestUvs = chestTopUvs;
+        } else {
+          chestUvs = chestTopUvs;
+        }
+        const uvWidth = chestUvs[2] - chestUvs[0];
+        const uvHeight = chestUvs[3] - chestUvs[1];
+        uvs[i * 2 + 0] = chestUvs[0] + (uvs[i * 2 + 0] * uvWidth);
+        uvs[i * 2 + 1] = (chestUvs[1] + uvHeight) - (uvs[i * 2 + 1] * uvHeight);
+      }
+
+      return geometry;
+    })();
+    const lidGeometry = (() => {
+      const geometry = new THREE.BoxBufferGeometry(1, 0.2, 1)
+        .applyMatrix4(new THREE.Matrix4().makeTranslation(0, 1/2 + 0.2/2, 0));
+      const uvs = geometry.getAttribute('uv').array;
+      const numUvs = uvs.length / 2;
+      for (let i = 0; i < numUvs; i++) {
+        const faceIndex = i >> 2;
+
+        let chestUvs;
+        if (faceIndex === 0) { // right
+          chestUvs = chestSideUvs;
+        } else if (faceIndex === 1) { // left
+          chestUvs = chestSideUvs;
+        } else if (faceIndex === 2) { // top
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 3) { // bottom
+          chestUvs = chestInsideUvs;
+        } else if (faceIndex === 4) { // front
+          chestUvs = chestFrontUvs;
+        } else {
+          chestUvs = chestSideUvs;
+        }
+        const uvWidth = chestUvs[2] - chestUvs[0];
+        const uvHeight = chestUvs[3] - chestUvs[1];
+        uvs[i * 2 + 0] = chestUvs[0] + (uvs[i * 2 + 0] * uvWidth);
+        uvs[i * 2 + 1] = (chestUvs[1] + uvHeight) - (uvs[i * 2 + 1] * uvHeight);
+      }
+
+      return geometry;
+    })();
+
+    const geometry = BufferGeometryUtils.mergeBufferGeometries([
+      baseGeometry,
+      lidGeometry,
+    ]);
+    return geometry;
+  })();
+
+  const chestOpenGeometry = (() => {
+    const baseGeometry = (() => {
+      const geometry = new THREE.BoxBufferGeometry(1, 0.5, 1)
+        .applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.5/2, 0));
+      const uvs = geometry.getAttribute('uv').array;
+      const numUvs = uvs.length / 2;
+      for (let i = 0; i < numUvs; i++) {
+        const faceIndex = i >> 2;
+
+        let chestUvs;
+        if (faceIndex === 0) { // right
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 1) { // left
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 2) { // top
+          chestUvs = chestInsideUvs;
+        } else if (faceIndex === 3) { // bottom
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 4) { // front
+          chestUvs = chestTopUvs;
+        } else {
+          chestUvs = chestTopUvs;
+        }
+        const uvWidth = chestUvs[2] - chestUvs[0];
+        const uvHeight = chestUvs[3] - chestUvs[1];
+        uvs[i * 2 + 0] = chestUvs[0] + (uvs[i * 2 + 0] * uvWidth);
+        uvs[i * 2 + 1] = (chestUvs[1] + uvHeight) - (uvs[i * 2 + 1] * uvHeight);
+      }
+
+      return geometry;
+    })();
+    const lidGeometry = (() => {
+      const geometry = new THREE.BoxBufferGeometry(1, 0.2, 1)
+        .applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0),
+          -Math.PI / 2
+        )))
+        .applyMatrix4(new THREE.Matrix4().makeTranslation(0, 1, -1/2 - 0.2/2));
+      const uvs = geometry.getAttribute('uv').array;
+      const numUvs = uvs.length / 2;
+      for (let i = 0; i < numUvs; i++) {
+        const faceIndex = i >> 2;
+
+        let chestUvs;
+        if (faceIndex === 0) { // right
+          chestUvs = chestSideUvs;
+        } else if (faceIndex === 1) { // left
+          chestUvs = chestSideUvs;
+        } else if (faceIndex === 2) { // top
+          chestUvs = chestTopUvs;
+        } else if (faceIndex === 3) { // bottom
+          chestUvs = chestInsideUvs;
+        } else if (faceIndex === 4) { // front
+          chestUvs = chestFrontUvs;
+        } else {
+          chestUvs = chestSideUvs;
+        }
+        const uvWidth = chestUvs[2] - chestUvs[0];
+        const uvHeight = chestUvs[3] - chestUvs[1];
+        uvs[i * 2 + 0] = chestUvs[0] + (uvs[i * 2 + 0] * uvWidth);
+        uvs[i * 2 + 1] = (chestUvs[1] + uvHeight) - (uvs[i * 2 + 1] * uvHeight);
+      }
+
+      return geometry;
+    })();
+
+    const geometry = BufferGeometryUtils.mergeBufferGeometries([
+      baseGeometry,
+      lidGeometry,
+    ]);
+    return geometry;
+  })();
+
+  const mesh = new THREE.Mesh(chestOpenGeometry, material);
+  mesh.frustumCulled = false;
+  console.log('for mesh', mesh);
+  scene.add(mesh);
+});
+
+function animate() {
+  orbitControls.update();
+
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(animate);
+
+navigator.xr.addEventListener('sessiongranted', e => {
+  let currentSession = null;
+  function onSessionStarted(session) {
+    session.addEventListener('end', onSessionEnded);
+
+    renderer.xr.setSession(session);
+
+    currentSession = session;
+  }
+  function onSessionEnded() {
+    currentSession.removeEventListener('end', onSessionEnded);
+
+    currentSession = null;
+  }
+  navigator.xr && navigator.xr.requestSession('immersive-vr', {
+    optionalFeatures: [
+      'local-floor',
+      'bounded-floor',
+    ],
+  }).then(onSessionStarted);
+});
+
+</script>
+</body>
+
+</html>

@@ -1,6 +1,6 @@
 {
-  "name": "Chest",
-  "description": "Describe your WebXR application",
+  "name": "Multiplayer",
+  "description": "Multiplayer Avatars XRPackage",
   "xr_type": "webxr-site@0.0.1",
-  "start_url": "chest.html"
+  "start_url": "index.html"
 }

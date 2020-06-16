@@ -226,6 +226,14 @@ const _updateRig = (rig, head, leftHand, rightHand) => {
 const myRig = _makeRig();
 _addRig(myRig);
 
+const _loadRigModel = async () => {
+  const res = await fetch('miku.wbn');
+  const ab = await res.arrayBuffer();
+  const uint8Array = new Uint8Array(ab);
+  const p = new XRPackage(uint8Array);
+  return p;
+};
+
 let channelConnection = null;
 let channelConnectionOpen = false;
 const peerConnections = [];
@@ -244,17 +252,32 @@ const _connectMultiplayer = async roomName => {
   channelConnection.addEventListener('peerconnection', e => {
     const peerConnection = e.data;
 
-    const playerRig = _makeRig();
-    _addRig(playerRig);
-    peerConnections.push(peerConnection);
+    let playerRig = null;
+    let live = true;
+    _loadRigModel()
+      .then(async p => {
+        await xrpackage.add(p);
+        if (live) {
+          playerRig = p;
+        } else {
+          xrpackage.remove(p);
+        }
+      });
 
+    peerConnections.push(peerConnection);
     peerConnection.addEventListener('close', () => {
       peerConnections.splice(peerConnections.indexOf(peerConnection), 1);
-      _removeRig(playerRig);
+      if (playerRig) {
+        xrpackage.remove(playerRig);
+        playerRig = null;
+      }
+      live = false;
     });
     peerConnection.addEventListener('message', e => {
-      const {pose: [head, leftHand, rightHand]} = e.data;
-      _updateRig(playerRig, head, leftHand, rightHand);
+      const {pose} = e.data;
+      if (playerRig) {
+        playerRig.setPose(pose);
+      }
     });
   });
 };
@@ -262,9 +285,6 @@ const _disconnectMultiplayer = async () => {
   if (channelConnection) {
     channelConnection.disconnect()
     channelConnection = null;
-
-    // const href = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    // history.replaceState(null, '', href);
   }
 };
 window.addEventListener('beforeunload', _disconnectMultiplayer);
@@ -298,18 +318,18 @@ function animate() {
   // send pose to other players
   if (channelConnectionOpen) {
     const pose = [
-      {
-        position: myRig.head.position.toArray(),
-        quaternion: myRig.head.quaternion.toArray(),
-      },
-      {
-        position: myRig.leftHand.position.toArray(),
-        quaternion: myRig.leftHand.quaternion.toArray(),
-      },
-      {
-        position: myRig.rightHand.position.toArray(),
-        quaternion: myRig.rightHand.quaternion.toArray(),
-      },
+      [
+        myRig.head.position.toArray(),
+        myRig.head.quaternion.toArray(),
+      ],
+      [
+        myRig.leftHand.position.toArray(),
+        myRig.leftHand.quaternion.toArray(),
+      ],
+      [
+        myRig.rightHand.position.toArray(),
+        myRig.rightHand.quaternion.toArray(),
+      ],
     ];
     channelConnection.send(JSON.stringify({
       pose,

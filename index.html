@@ -107,16 +107,14 @@
   </header>
   <canvas id=canvas></canvas>
 <script type=module>
-import THREE from './three.module.js';
-window.THREE = THREE;
-</script>
-<script type=module>
-import {OrbitControls} from './OrbitControls.js';
-import {GLTFLoader} from './GLTFLoader.js';
+import * as THREE from './three.module.js';
+// window.THREE = THREE;
+// import {OrbitControls} from './OrbitControls.js';
+// import {GLTFLoader} from './GLTFLoader.js';
 // import {GLTFExporter} from './GLTFExporter.js';
 // import {XRControllerModelFactory} from './XRControllerModelFactory.js';
-import {makeId, XRChannelConnection} from './multiplayer.js';
-import {initLocalRig, updatePlayerFromCamera, updatePlayerFromXr, updatePlayerFromArrays, updatePlayerDefault, getRigBoneTexture, bindChannelConnection, bindPeerConnection} from './peerconnection.js';
+import {makeId, XRChannelConnection} from 'https://2.metartc.com/xrrtc.js';
+// import {initLocalRig, updatePlayerFromCamera, updatePlayerFromXr, updatePlayerFromArrays, updatePlayerDefault, getRigBoneTexture, bindChannelConnection, bindPeerConnection} from './peerconnection.js';
 import address from 'https://contracts.webaverse.com/address.js';
 import abi from 'https://contracts.webaverse.com/abi.js';
 
@@ -128,6 +126,8 @@ const rpcUrl = `https://${network}.infura.io/v3/${infuraApiKey}`;
 const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 // window.web3 = web3;
 const contract = new web3.eth.Contract(abi, address);
+
+const localVector = new THREE.Vector3();
 
 function parseQuery(queryString) {
   var query = {};
@@ -155,18 +155,19 @@ const renderer = new THREE.WebGLRenderer({
   antialias: true,
   preserveDrawingBuffer: true,
 });
-renderer.autoClear = false;
+// renderer.autoClear = false;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.sortObjects = false;
 renderer.physicallyCorrectLights = true;
-renderer.shadowMap.enabled = true;
+renderer.xr.enabled = true;
+/* renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.setClearColor(new THREE.Color(0xEEEEEE), 1);
 renderer.viewportEnabled = true;
 renderer.setViewport = (oldSetViewport => function setViewport() {
   renderer.viewportEnabled && oldSetViewport.apply(this, arguments);
-})(renderer.setViewport);
+})(renderer.setViewport); */
 
 const scene = new THREE.Scene();
 // scene.background = new THREE.Color(0xEEEEEE);
@@ -190,13 +191,128 @@ const directionalLight2 = new THREE.DirectionalLight(0xFFFFFF, 3);
 directionalLight2.position.set(-0.5, 0.1, 0.5).multiplyScalar(100);
 scene.add(directionalLight2);
 
-function animate() {
-  renderer.render(scene, camera);
-}
-renderer.setAnimationLoop(animate);
+let rig = null;
+// let videoMediaStream = null;
+let currentSession = null;
+
+const _makeRig = () => {
+  const head = new THREE.Mesh(new THREE.BoxBufferGeometry(0.1, 0.05, 0.2), new THREE.MeshPhongMaterial({color: 0xef5350}));
+  const leftHand = new THREE.Mesh(new THREE.BoxBufferGeometry(0.05, 0.01, 0.1), new THREE.MeshPhongMaterial({color: 0x66bb6a}));
+  const rightHand = new THREE.Mesh(new THREE.BoxBufferGeometry(0.05, 0.01, 0.1), new THREE.MeshPhongMaterial({color: 0x42a5f5}));
+  return {
+    head,
+    leftHand,
+    rightHand,
+  };
+};
+const _addRig = rig => {
+  scene.add(rig.head);
+  scene.add(rig.leftHand);
+  scene.add(rig.rightHand);
+};
+const _removeRig = rig => {
+  scene.remove(rig.head);
+  scene.remove(rig.leftHand);
+  scene.remove(rig.rightHand);
+};
+const _updateRig = (rig, head, leftHand, rightHand) => {
+  rig.head.position.fromArray(head.position);
+  rig.head.quaternion.fromArray(head.quaternion);
+  rig.leftHand.position.fromArray(leftHand.position);
+  rig.leftHand.quaternion.fromArray(leftHand.quaternion);
+  rig.rightHand.position.fromArray(rightHand.position);
+  rig.rightHand.quaternion.fromArray(rightHand.quaternion);
+};
+const myRig = _makeRig();
+_addRig(myRig);
+
+let channelConnection = null;
+let channelConnectionOpen = false;
+const peerConnections = [];
+let microphoneMediaStream = null;
+const _connectMultiplayer = async roomName => {
+  channelConnection = new XRChannelConnection(`${presenceHost}/`, {
+    roomName,
+    // displayName: 'user',
+  });
+  channelConnection.addEventListener('open', e => {
+    channelConnectionOpen = true;
+  }, {once: true});
+  channelConnection.addEventListener('close', e => {
+    channelConnectionOpen = false;
+  }, {once: true});
+  channelConnection.addEventListener('peerconnection', e => {
+    const peerConnection = e.data;
+
+    const playerRig = _makeRig();
+    _addRig(playerRig);
+    peerConnections.push(peerConnection);
+
+    peerConnection.addEventListener('close', () => {
+      peerConnections.splice(peerConnections.indexOf(peerConnection), 1);
+      _removeRig(playerRig);
+    });
+    peerConnection.addEventListener('message', e => {
+      const {pose: [head, leftHand, rightHand]} = e.data;
+      _updateRig(playerRig, head, leftHand, rightHand);
+    });
+  });
+};
+const _disconnectMultiplayer = async () => {
+  if (channelConnection) {
+    channelConnection.disconnect()
+    channelConnection = null;
+
+    // const href = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+    // history.replaceState(null, '', href);
+  }
+};
+window.addEventListener('beforeunload', _disconnectMultiplayer);
+
+/* const planeGeometry = new THREE.SphereGeometry(10, 128, 128);
+const planeMaterial = new THREE.MeshBasicMaterial({
+  color: 0x0000FF,
+  side: THREE.DoubleSide,
+});
+const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+// plane.z = -3;
+scene.add(plane); */
 
 function animate() {
-  orbitControls.update();
+  // orbitControls.update();
+
+  // update local player
+  const vrCamera = renderer.xr.getCamera(camera).cameras[0];
+  if (vrCamera) {
+    vrCamera.matrix.decompose(myRig.head.position, myRig.head.quaternion, localVector);
+    /* myRig.head.position.copy(camera.position);
+    myRig.head.quaternion.copy(camera.quaternion); */
+    myRig.leftHand.position.copy(myRig.head.position).add(new THREE.Vector3(-0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
+    myRig.leftHand.quaternion.copy(myRig.head.quaternion);
+    myRig.rightHand.position.copy(myRig.head.position).add(new THREE.Vector3(0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
+    myRig.rightHand.quaternion.copy(myRig.head.quaternion);
+  }
+
+  // send pose to other players
+  if (channelConnectionOpen) {
+    const pose = [
+      {
+        position: myRig.head.position.toArray(),
+        quaternion: myRig.head.quaternion.toArray(),
+      },
+      {
+        position: myRig.leftHand.position.toArray(),
+        quaternion: myRig.leftHand.quaternion.toArray(),
+      },
+      {
+        position: myRig.rightHand.position.toArray(),
+        quaternion: myRig.rightHand.quaternion.toArray(),
+      },
+    ];
+    channelConnection.send(JSON.stringify({
+      pose,
+    }));
+  }
 
   renderer.render(scene, camera);
 }

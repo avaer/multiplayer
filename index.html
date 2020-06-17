@@ -246,6 +246,33 @@ const _connectMultiplayer = async roomName => {
   });
   channelConnection.addEventListener('open', e => {
     channelConnectionOpen = true;
+
+    const queue = [];
+    let bufferedAmountLow = true;
+    channelConnection.send = (_send => function send(a) {
+      // console.log('send', a, this);
+      if (bufferedAmountLow) {
+        // try {
+          bufferedAmountLow = false;
+          return _send.apply(this, arguments);
+        /* } catch(err) {
+          console.log('got error', err);
+        } */
+      } else {
+        queue.push(a);
+      }
+    })(channelConnection.send);
+    channelConnection.dataChannel.addEventListener('bufferedamountlow', e => {
+      // console.log('buffered amount low', e);
+      bufferedAmountLow = true;
+      if (queue.length > 0) {
+        /* if (channelConnection.dataChannel.bufferedAmount !== 0) {
+          console.log('got buffered amount', channelConnection.dataChannel.bufferedAmount, channelConnection.dataChannel.bufferedAmountLowThreshold);
+          throw new Error('already buffered!');
+        } */
+        channelConnection.send(queue.shift());
+      }
+    });
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {
@@ -260,31 +287,30 @@ const _connectMultiplayer = async roomName => {
     let playerRig = null;
     let live = true;
     let loading = false;
-    const queue = [];
+    const loadQueue = [];
+    let sending = false;
+    let sendQueue = [];
+    let avatarQueued = null;
     const _loadAvatar = async u => {
       if (!loading) {
         loading = true;
 
-        if (u !== modelUrl) {
-          modelUrl = u;
-
-          const p = await _loadRigModel(u);
-          await xrpackage.add(p);
-          if (live) {
-            playerRig = p;
-          } else {
-            xrpackage.remove(p);
-          }
+        const p = await _loadRigModel(u);
+        await xrpackage.add(p);
+        if (live) {
+          playerRig = p;
+        } else {
+          xrpackage.remove(p);
         }
 
         loading = false;
 
-        if (queue.length > 0) {
-          const fn = queue.shift();
+        if (loadQueue.length > 0) {
+          const fn = loadQueue.shift();
           fn();
         }
       } else {
-        queue.push(() => {
+        loadQueue.push(() => {
           _loadAvatar(u);
         });
       }
@@ -304,42 +330,90 @@ const _connectMultiplayer = async roomName => {
     });
     peerConnection.addEventListener('message', e => {
       const {data} = e;
-      const {method} = data;
-      if (method === 'pose') {
-        if (playerRig) {
-          const {pose} = data;
-          playerRig.setPose(pose);
+      if (typeof data === 'string') {
+        const j = JSON.parse(data);
+        const {method} = j;
+        if (method === 'pose') {
+          if (playerRig) {
+            const {pose} = j;
+            console.log('handle pose', pose);
+            playerRig.setPose(pose);
+          }
+        } else if (method === 'avatarPlz') {
+          const {peerId, lastUrl} = j;
+          if (peerId === channelConnection.connectionId) {
+            const _handleAvatarPlz = async lastUrl => {
+              if (!sending) {
+                sending = true;
+
+                const newUrl = 'miku.wbn';
+                console.log('got avatar plz', lastUrl, newUrl);
+                if (lastUrl !== newUrl) {
+                  const res = await fetch(newUrl);
+                  const ab = await res.arrayBuffer();
+                  const uint8Array = new Uint8Array(ab);
+                  const packetSize = 16 * 1024;
+                  const numPackets = Math.ceil(ab.byteLength / packetSize);
+                  channelConnection.send(JSON.stringify({
+                    method: 'avatar',
+                    peerId: channelConnection.connectionId,
+                    url: newUrl,
+                    numPackets,
+                  }));
+                  for (let i = 0; i < numPackets; i++) {
+                    channelConnection.send(uint8Array.slice(i * packetSize, (i+1) * packetSize));
+                  }
+                }
+
+                sending = false;
+
+                if (sendQueue.length > 0) {
+                  const fn = sendQueue.shift();
+                  fn();
+                }
+              } else {
+                sendQueue.push(() => {
+                  _handleAvatarPlz(lastUrl);
+                });
+              }
+            };
+            _handleAvatarPlz(lastUrl);
+          }
+        } else if (method === 'avatar') {
+          const {peerId, url, numPackets} = j;
+          console.log('got avatar push', peerId, peerConnection.connectionId, url, modelUrl);
+          if (peerId === peerConnection.connectionId && url !== modelUrl) {
+            avatarQueued = {
+              url,
+              numPackets,
+              packets: [],
+            };
+            modelUrl = url;
+          }
+        } else {
+          console.warn('bad method', j);
         }
-      } else if (method === 'avatar') {
-        const {url} = data;
-        console.log('load url', url);
-        _loadAvatar(url);
       } else {
-        console.warn('bad method', method);
+        // console.log('got non-string data', data, avatarQueued && avatarQueued.url, avatarQueued && avatarQueued.numPackets, avatarQueued && avatarQueued.packets);
+
+        if (avatarQueued) {
+          avatarQueued.packets.push(data);
+          if (avatarQueued.packets.length >= avatarQueued.numPackets) {
+            console.log('got all packets', avatarQueued.packets);
+            avatarQueued = null;
+          }
+        }
       }
     });
+    let interval = setInterval(() => {
+      channelConnection.send(JSON.stringify({
+        method: 'avatarPlz',
+        peerId: peerConnection.connectionId,
+        lastUrl: modelUrl,
+        // url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
+      }));
+    }, 1000);
   });
-
-  let interval = null;
-  (async () => {
-    // console.log('fetching...');
-    const res = await fetch('miku.wbn');
-    const ab = await res.arrayBuffer();
-    const uint8Array = new Uint8Array(ab);
-    // console.log('fetch done', uint8Array);
-    const p = new XRPackage(uint8Array);
-    // console.log('uploading...');
-    const hash = await p.upload();
-    // console.log('got hash', hash);
-    if (channelConnectionOpen) {
-      interval = setInterval(() => {
-        channelConnection.send(JSON.stringify({
-          method: 'avatar',
-          url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
-        }));
-      }, 1000);
-    }
-  })();
 };
 const _disconnectMultiplayer = async () => {
   if (channelConnection) {

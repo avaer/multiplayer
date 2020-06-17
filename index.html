@@ -227,8 +227,8 @@ const _updateRig = (rig, head, leftHand, rightHand) => {
 const myRig = _makeRig();
 _addRig(myRig);
 
-const _loadRigModel = async () => {
-  const res = await fetch('miku.wbn');
+const _loadRigModel = async u => {
+  const res = await fetch(u);
   const ab = await res.arrayBuffer();
   const uint8Array = new Uint8Array(ab);
   const p = new XRPackage(uint8Array);
@@ -248,22 +248,47 @@ const _connectMultiplayer = async roomName => {
     channelConnectionOpen = true;
   }, {once: true});
   channelConnection.addEventListener('close', e => {
+    if (interval) {
+      clearInterval(interval);
+    }
     channelConnectionOpen = false;
   }, {once: true});
   channelConnection.addEventListener('peerconnection', e => {
     const peerConnection = e.data;
 
+    let modelUrl = null;
     let playerRig = null;
     let live = true;
-    _loadRigModel()
-      .then(async p => {
-        await xrpackage.add(p);
-        if (live) {
-          playerRig = p;
-        } else {
-          xrpackage.remove(p);
+    let loading = false;
+    const queue = [];
+    const _loadAvatar = async u => {
+      if (!loading) {
+        loading = true;
+
+        if (u !== modelUrl) {
+          modelUrl = u;
+
+          const p = await _loadRigModel(u);
+          await xrpackage.add(p);
+          if (live) {
+            playerRig = p;
+          } else {
+            xrpackage.remove(p);
+          }
         }
-      });
+
+        loading = false;
+
+        if (queue.length > 0) {
+          const fn = queue.shift();
+          fn();
+        }
+      } else {
+        queue.push(() => {
+          _loadAvatar(u);
+        });
+      }
+    };
 
     peerConnections.push(peerConnection);
     peerConnection.addEventListener('close', () => {
@@ -272,15 +297,49 @@ const _connectMultiplayer = async roomName => {
         xrpackage.remove(playerRig);
         playerRig = null;
       }
+      if (interval) {
+        clearInterval(interval);
+      }
       live = false;
     });
     peerConnection.addEventListener('message', e => {
-      const {pose} = e.data;
-      if (playerRig) {
-        playerRig.setPose(pose);
+      const {data} = e;
+      const {method} = data;
+      if (method === 'pose') {
+        if (playerRig) {
+          const {pose} = data;
+          playerRig.setPose(pose);
+        }
+      } else if (method === 'avatar') {
+        const {url} = data;
+        console.log('load url', url);
+        _loadAvatar(url);
+      } else {
+        console.warn('bad method', method);
       }
     });
   });
+
+  let interval = null;
+  (async () => {
+    // console.log('fetching...');
+    const res = await fetch('miku.wbn');
+    const ab = await res.arrayBuffer();
+    const uint8Array = new Uint8Array(ab);
+    // console.log('fetch done', uint8Array);
+    const p = new XRPackage(uint8Array);
+    // console.log('uploading...');
+    const hash = await p.upload();
+    // console.log('got hash', hash);
+    if (channelConnectionOpen) {
+      interval = setInterval(() => {
+        channelConnection.send(JSON.stringify({
+          method: 'avatar',
+          url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
+        }));
+      }, 1000);
+    }
+  })();
 };
 const _disconnectMultiplayer = async () => {
   if (channelConnection) {
@@ -334,6 +393,7 @@ function animate() {
       ],
     ];
     channelConnection.send(JSON.stringify({
+      method: 'pose',
       pose,
     }));
   }

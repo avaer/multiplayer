@@ -335,7 +335,7 @@ const _connectMultiplayer = async roomName => {
           }
         } else if (method === 'avatar') {
           const {peerId, url} = j;
-          console.log('got avatar', peerId, peerConnection.connectionId, url, modelUrl);
+          // console.log('got avatar', peerId, peerConnection.connectionId, url, modelUrl);
           if (peerId === peerConnection.connectionId && url !== modelUrl) {
             modelUrl = url;
             _loadAvatar(url);
@@ -372,7 +372,7 @@ const _connectMultiplayer = async roomName => {
     const uint8Array = new Uint8Array(ab);
     const p = new XRPackage(uint8Array);
     const hash = await p.upload();
-    console.log('got hash', hash);
+    // console.log('got hash', hash);
 
     let interval;
     if (live) {

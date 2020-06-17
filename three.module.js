@@ -23494,6 +23494,8 @@ function WebXRManager( renderer, gl ) {
 	var animation = new WebGLAnimation();
 	animation.setAnimationLoop( onAnimationFrame );
 
+	this.getPose = () => pose;
+
 	this.setAnimationLoop = function ( callback ) {
 
 		onAnimationFrameCallback = callback;

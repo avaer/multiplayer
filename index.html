@@ -128,6 +128,7 @@ const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 const contract = new web3.eth.Contract(abi, address);
 
 const localVector = new THREE.Vector3();
+const localMatrix = new THREE.Matrix4();
 
 function parseQuery(queryString) {
   var query = {};
@@ -304,9 +305,10 @@ function animate() {
   // orbitControls.update();
 
   // update local player
-  const vrCamera = renderer.xr.getCamera(camera).cameras[0];
-  if (vrCamera) {
-    vrCamera.matrix.decompose(myRig.head.position, myRig.head.quaternion, localVector);
+  const pose = renderer.xr.getPose();
+  if (pose) {
+    localMatrix.fromArray(pose.transform.matrix)
+      .decompose(myRig.head.position, myRig.head.quaternion, localVector);
     /* myRig.head.position.copy(camera.position);
     myRig.head.quaternion.copy(camera.quaternion); */
     myRig.leftHand.position.copy(myRig.head.position).add(new THREE.Vector3(-0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));

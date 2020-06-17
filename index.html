@@ -227,14 +227,6 @@ const _updateRig = (rig, head, leftHand, rightHand) => {
 const myRig = _makeRig();
 _addRig(myRig);
 
-const _loadRigModel = async u => {
-  const res = await fetch(u);
-  const ab = await res.arrayBuffer();
-  const uint8Array = new Uint8Array(ab);
-  const p = new XRPackage(uint8Array);
-  return p;
-};
-
 let channelConnection = null;
 let channelConnectionOpen = false;
 const peerConnections = [];
@@ -291,11 +283,16 @@ const _connectMultiplayer = async roomName => {
     let sending = false;
     let sendQueue = [];
     let avatarQueued = null;
-    const _loadAvatar = async u => {
+    const _loadAvatar = async uint8Array => {
       if (!loading) {
         loading = true;
 
-        const p = await _loadRigModel(u);
+        const p = new XRPackage(uint8Array);
+        /* const res = await fetch(u);
+        const ab = await res.arrayBuffer();
+        const uint8Array = new Uint8Array(ab);
+        const p = new XRPackage(uint8Array);
+        return p; */
         await xrpackage.add(p);
         if (live) {
           playerRig = p;
@@ -311,7 +308,7 @@ const _connectMultiplayer = async roomName => {
         }
       } else {
         loadQueue.push(() => {
-          _loadAvatar(u);
+          _loadAvatar(uint8Array);
         });
       }
     };
@@ -336,7 +333,6 @@ const _connectMultiplayer = async roomName => {
         if (method === 'pose') {
           if (playerRig) {
             const {pose} = j;
-            console.log('handle pose', pose);
             playerRig.setPose(pose);
           }
         } else if (method === 'avatarPlz') {
@@ -361,7 +357,7 @@ const _connectMultiplayer = async roomName => {
                     numPackets,
                   }));
                   for (let i = 0; i < numPackets; i++) {
-                    channelConnection.send(uint8Array.slice(i * packetSize, (i+1) * packetSize));
+                    channelConnection.send(uint8Array.slice(i * packetSize, Math.min((i+1) * packetSize, uint8Array.byteLength)));
                   }
                 }
 
@@ -403,7 +399,18 @@ const _connectMultiplayer = async roomName => {
         if (avatarQueued) {
           avatarQueued.packets.push(data);
           if (avatarQueued.packets.length >= avatarQueued.numPackets) {
-            console.log('got all packets', avatarQueued.packets);
+            let size = 0;
+            for (let i = 0; i < avatarQueued.packets.length; i++) {
+              size += avatarQueued.packets[i].byteLength;
+            }
+            const uint8Array = new Uint8Array(size);
+            let index = 0;
+            for (let i = 0; i < avatarQueued.packets.length; i++) {
+              const packet = avatarQueued.packets[i];
+              uint8Array.set(new Uint8Array(packet), index);
+              index += packet.byteLength;
+            }
+            _loadAvatar(uint8Array);
             avatarQueued = null;
           }
         }

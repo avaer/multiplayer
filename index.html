@@ -240,6 +240,7 @@ const _connectMultiplayer = async roomName => {
     channelConnectionOpen = true;
 
     const queue = [];
+    let index = 0;
     let bufferedAmountLow = true;
     channelConnection.send = (_send => function send(a) {
       // console.log('send', a, this);
@@ -257,12 +258,19 @@ const _connectMultiplayer = async roomName => {
     channelConnection.dataChannel.addEventListener('bufferedamountlow', e => {
       // console.log('buffered amount low', e);
       bufferedAmountLow = true;
-      if (queue.length > 0) {
+      if (index < queue.length) {
         /* if (channelConnection.dataChannel.bufferedAmount !== 0) {
           console.log('got buffered amount', channelConnection.dataChannel.bufferedAmount, channelConnection.dataChannel.bufferedAmountLowThreshold);
           throw new Error('already buffered!');
         } */
-        channelConnection.send(queue.shift());
+        const entry = queue[index];
+        queue[index] = null;
+        index++;
+        channelConnection.send(entry);
+        if (index >= queue.length) {
+          queue.length = 0;
+          index = 0;
+        }
       }
     });
   }, {once: true});

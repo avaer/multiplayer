@@ -272,7 +272,7 @@ const _connectMultiplayer = async roomName => {
     }
     channelConnectionOpen = false;
   }, {once: true});
-  channelConnection.addEventListener('peerconnection', e => {
+  channelConnection.addEventListener('peerconnection', async e => {
     const peerConnection = e.data;
 
     let modelUrl = null;
@@ -283,16 +283,14 @@ const _connectMultiplayer = async roomName => {
     let sending = false;
     let sendQueue = [];
     let avatarQueued = null;
-    const _loadAvatar = async uint8Array => {
+    const _loadAvatar = async u => {
       if (!loading) {
         loading = true;
 
-        const p = new XRPackage(uint8Array);
-        /* const res = await fetch(u);
+        const res = await fetch(u);
         const ab = await res.arrayBuffer();
         const uint8Array = new Uint8Array(ab);
         const p = new XRPackage(uint8Array);
-        return p; */
         await xrpackage.add(p);
         if (live) {
           playerRig = p;
@@ -308,7 +306,7 @@ const _connectMultiplayer = async roomName => {
         }
       } else {
         loadQueue.push(() => {
-          _loadAvatar(uint8Array);
+          _loadAvatar(u);
         });
       }
     };
@@ -335,60 +333,12 @@ const _connectMultiplayer = async roomName => {
             const {pose} = j;
             playerRig.setPose(pose);
           }
-        } else if (method === 'avatarPlz') {
-          const {peerId, lastUrl} = j;
-          if (peerId === channelConnection.connectionId) {
-            const _handleAvatarPlz = async lastUrl => {
-              if (!sending) {
-                sending = true;
-
-                const newUrl = 'miku.wbn';
-                console.log('got avatar plz', lastUrl, newUrl);
-                if (lastUrl !== newUrl) {
-                  const res = await fetch(newUrl);
-                  const ab = await res.arrayBuffer();
-                  const uint8Array = new Uint8Array(ab);
-                  const packetSize = 16 * 1024;
-                  const numPackets = Math.ceil(ab.byteLength / packetSize);
-                  channelConnection.send(JSON.stringify({
-                    method: 'avatar',
-                    peerId: channelConnection.connectionId,
-                    url: newUrl,
-                    numPackets,
-                  }));
-                  for (let i = 0; i < numPackets; i++) {
-                    channelConnection.send(uint8Array.slice(i * packetSize, Math.min((i+1) * packetSize, uint8Array.byteLength)));
-                  }
-                }
-
-                sending = false;
-
-                if (sendQueue.length > 0) {
-                  const fn = sendQueue.shift();
-                  fn();
-                }
-              } else {
-                sendQueue.push(() => {
-                  _handleAvatarPlz(lastUrl);
-                });
-              }
-            };
-            _handleAvatarPlz(lastUrl);
-          }
         } else if (method === 'avatar') {
-          const {peerId, url, numPackets} = j;
-          console.log('got avatar push', peerId, peerConnection.connectionId, url, modelUrl);
+          const {peerId, url} = j;
+          console.log('got avatar', peerId, peerConnection.connectionId, url, modelUrl);
           if (peerId === peerConnection.connectionId && url !== modelUrl) {
-            if (avatarQueued) {
-              console.warn(avatarQueued);
-              throw new Error('double avatar queued!');
-            }
-            avatarQueued = {
-              url,
-              numPackets,
-              packets: [],
-            };
             modelUrl = url;
+            _loadAvatar(url);
           }
         } else {
           console.warn('bad method', j);
@@ -396,7 +346,7 @@ const _connectMultiplayer = async roomName => {
       } else {
         // console.log('got non-string data', data, avatarQueued && avatarQueued.url, avatarQueued && avatarQueued.numPackets, avatarQueued && avatarQueued.packets);
 
-        if (avatarQueued) {
+        /* if (avatarQueued) {
           avatarQueued.packets.push(data);
           if (avatarQueued.packets.length >= avatarQueued.numPackets) {
             let size = 0;
@@ -413,17 +363,27 @@ const _connectMultiplayer = async roomName => {
             _loadAvatar(uint8Array);
             avatarQueued = null;
           }
-        }
+        } */
       }
     });
-    let interval = setInterval(() => {
-      channelConnection.send(JSON.stringify({
-        method: 'avatarPlz',
-        peerId: peerConnection.connectionId,
-        lastUrl: modelUrl,
-        // url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
-      }));
-    }, 1000);
+
+    const res = await fetch('miku.wbn');
+    const ab = await res.arrayBuffer();
+    const uint8Array = new Uint8Array(ab);
+    const p = new XRPackage(uint8Array);
+    const hash = await p.upload();
+    console.log('got hash', hash);
+
+    let interval;
+    if (live) {
+      interval = setInterval(() => {
+        channelConnection.send(JSON.stringify({
+          method: 'avatar',
+          peerId: channelConnection.connectionId,
+          url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
+        }));
+      }, 1000);
+    }
   });
 };
 const _disconnectMultiplayer = async () => {

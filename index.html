@@ -383,6 +383,10 @@ const _connectMultiplayer = async roomName => {
           const {peerId, url, numPackets} = j;
           console.log('got avatar push', peerId, peerConnection.connectionId, url, modelUrl);
           if (peerId === peerConnection.connectionId && url !== modelUrl) {
+            if (avatarQueued) {
+              console.warn(avatarQueued);
+              throw new Error('double avatar queued!');
+            }
             avatarQueued = {
               url,
               numPackets,

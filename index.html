@@ -277,7 +277,7 @@ const _connectMultiplayer = async roomName => {
     roomName,
     // displayName: 'user',
   });
-  channelConnection.addEventListener('open', e => {
+  channelConnection.addEventListener('open', async e => {
     channelConnectionOpen = true;
 
     const queue = [];
@@ -314,6 +314,9 @@ const _connectMultiplayer = async roomName => {
         }
       }
     });
+
+    const micStream = await channelConnection.enableMic();
+    xrpackage.setMicStream(micStream);
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {

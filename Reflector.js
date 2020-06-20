@@ -155,7 +155,18 @@ function Reflector( geometry, options ) {
 
 		scope.visible = false;
 
-		var currentRenderTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(renderTarget);
+		renderer.setRenderTarget(null);
+
+		xrpackage.render(
+			renderTarget.width,
+			renderTarget.height,
+            virtualCamera.matrixWorld.toArray(new Float32Array(16)),
+            virtualCamera.projectionMatrix.toArray(new Float32Array(16)),
+			renderer.getProperty(renderTarget).__webglFramebuffer
+	    );
+
+		/* var currentRenderTarget = renderer.getRenderTarget();
 
 		var currentVrEnabled = renderer.xr.enabled;
 		var currentShadowAutoUpdate = renderer.shadowMap.autoUpdate;
@@ -166,11 +177,12 @@ function Reflector( geometry, options ) {
 		renderer.setRenderTarget( renderTarget );
 		renderer.clear();
 		renderer.render( scene, virtualCamera );
+		// console.log('render target', renderTarget, renderer.getProperty(renderTarget).__webglFramebuffer);
 
 		renderer.xr.enabled = currentVrEnabled;
 		renderer.shadowMap.autoUpdate = currentShadowAutoUpdate;
 
-		renderer.setRenderTarget( currentRenderTarget );
+		renderer.setRenderTarget( currentRenderTarget ); */
 
 		// Restore viewport
 

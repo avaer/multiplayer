@@ -330,6 +330,7 @@ const _connectMultiplayer = async roomName => {
 
     let modelUrl = null;
     let playerRig = null;
+    let microphoneMediaStream = null;
     let live = true;
     let loading = false;
     const loadQueue = [];
@@ -345,8 +346,13 @@ const _connectMultiplayer = async roomName => {
         const uint8Array = new Uint8Array(ab);
         const p = new XRPackage(uint8Array);
         await xrpackage.add(p);
+        await p.loadAvatar();
         if (live) {
           playerRig = p;
+          if (microphoneMediaStream) {
+            console.log('set old mic stream', playerRig, microphoneMediaStream);
+            playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
+          }
         } else {
           xrpackage.remove(p);
         }
@@ -417,6 +423,19 @@ const _connectMultiplayer = async roomName => {
             avatarQueued = null;
           }
         } */
+      }
+    });
+    peerConnection.addEventListener('addtrack', e => {
+      const track = e.data;
+      microphoneMediaStream = new MediaStream([track]);
+      if (playerRig) {
+        playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
+      }
+    });
+    peerConnection.addEventListener('removetrack', e => {
+      const track = e.data;
+      if (playerRig) {
+        playerRig.context.rig.setMicrophoneMediaStream(null);
       }
     });
 

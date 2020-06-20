@@ -315,8 +315,9 @@ const _connectMultiplayer = async roomName => {
       }
     });
 
-    const micStream = await channelConnection.enableMic();
-    xrpackage.setMicStream(micStream);
+    const micMediaStreamTrack = await channelConnection.enableMic();
+    const micMediaStream = new MediaStream([micMediaStreamTrack]);
+    xrpackage.setMicStream(micMediaStream);
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {

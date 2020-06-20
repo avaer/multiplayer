@@ -24439,6 +24439,8 @@ function WebGLRenderer( parameters ) {
 
 	initGLContext();
 
+	this.getProperty = o => properties.get(o);
+
 	// xr
 
 	var xr = new WebXRManager( _this, _gl );

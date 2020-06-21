@@ -439,9 +439,10 @@ const _connectMultiplayer = async roomName => {
       }
     });
 
-    const res = await fetch('miku.wbn');
-    const ab = await res.arrayBuffer();
-    const uint8Array = new Uint8Array(ab);
+    const res = await fetch('miku.vrm');
+    const b = await res.blob();
+    b.name = 'model.vrm';
+    const uint8Array = await XRPackage.compileFromFile(b);
     const p = new XRPackage(uint8Array);
     const hash = await p.upload();
     // console.log('got hash', hash);

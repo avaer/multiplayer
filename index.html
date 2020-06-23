@@ -146,6 +146,8 @@ function makePromise() {
   p.reject = reject;
   return p;
 }
+const _getUsername = () => xrpackage.getEnv('username');
+const _getAvatar = () => xrpackage.getEnv('avatar');
 
 // const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({
@@ -201,8 +203,18 @@ const _makeTextMesh = text => {
   textMesh.sync();
   return textMesh;
 };
-const textMesh = _makeTextMesh('Anonymous');
+const textMesh = _makeTextMesh(_getUsername());
 scene.add(textMesh);
+
+xrpackage.addEventListener('envchange', e => {
+  const {key, value} = e.data;
+  if (key === 'username') {
+    textMesh.text = value;
+    textMesh.sync();
+  } /* else if (key === 'avatar') {
+    
+  } */
+});
 
 let rig = null;
 // let videoMediaStream = null;
@@ -308,7 +320,7 @@ const _connectMultiplayer = async roomName => {
   channelConnection.addEventListener('peerconnection', async e => {
     const peerConnection = e.data;
 
-    let modelUrl = null;
+    let modelHash = null;
     let playerRig = null;
     let microphoneMediaStream = null;
     let live = true;
@@ -317,10 +329,11 @@ const _connectMultiplayer = async roomName => {
     let sending = false;
     let sendQueue = [];
     let avatarQueued = null;
-    const _loadAvatar = async u => {
+    const _loadAvatar = async hash => {
       if (!loading) {
         loading = true;
 
+        const u = `https://ipfs.exokit.org/ipfs/${hash}.wbn`;
         const res = await fetch(u);
         const ab = await res.arrayBuffer();
         const uint8Array = new Uint8Array(ab);
@@ -346,7 +359,7 @@ const _connectMultiplayer = async roomName => {
         }
       } else {
         loadQueue.push(() => {
-          _loadAvatar(u);
+          _loadAvatar(hash);
         });
       }
     };
@@ -390,10 +403,10 @@ const _connectMultiplayer = async roomName => {
             playerRig.textMesh.sync();
           }
         } else if (method === 'avatar') {
-          const {peerId, url} = j;
-          if (peerId === peerConnection.connectionId && url !== modelUrl) {
-            modelUrl = url;
-            _loadAvatar(url);
+          const {peerId, hash} = j;
+          if (peerId === peerConnection.connectionId && hash !== modelHash) {
+            modelHash = hash;
+            _loadAvatar(hash);
           }
         } else {
           console.warn('unknown method', method);
@@ -439,13 +452,13 @@ const _connectMultiplayer = async roomName => {
     }); */
     peerConnections.push(peerConnection);
 
-    const res = await fetch('miku.vrm');
+    /* const res = await fetch('miku.vrm');
     const b = await res.blob();
     b.name = 'model.vrm';
     const uint8Array = await XRPackage.compileFromFile(b);
     const p = new XRPackage(uint8Array);
     const hash = await p.upload();
-    // console.log('got hash', hash);
+    // console.log('got hash', hash); */
 
     let interval;
     if (live) {
@@ -453,12 +466,12 @@ const _connectMultiplayer = async roomName => {
         channelConnection.send(JSON.stringify({
           method: 'name',
           peerId: channelConnection.connectionId,
-          name: 'Player One',
+          name: _getUsername(),
         }));
         channelConnection.send(JSON.stringify({
           method: 'avatar',
           peerId: channelConnection.connectionId,
-          url: `https://ipfs.exokit.org/ipfs/${hash}.wbn`,
+          hash: _getAvatar(),
         }));
       }, 1000);
     }

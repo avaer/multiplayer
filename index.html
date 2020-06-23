@@ -384,7 +384,6 @@ const _connectMultiplayer = async roomName => {
           }
         } else if (method === 'avatar') {
           const {peerId, url} = j;
-          // console.log('got avatar', peerId, peerConnection.connectionId, url, modelUrl);
           if (peerId === peerConnection.connectionId && url !== modelUrl) {
             modelUrl = url;
             _loadAvatar(url);

@@ -105,16 +105,10 @@
     <div class="xr vr">VR running</div>
     <div class="xr overlay">Overlay running</div>
   </header>
-  <canvas id=canvas></canvas>
 <script type=module>
 import * as THREE from './three.module.js';
-// window.THREE = THREE;
-// import {OrbitControls} from './OrbitControls.js';
-// import {GLTFLoader} from './GLTFLoader.js';
-// import {GLTFExporter} from './GLTFExporter.js';
-// import {XRControllerModelFactory} from './XRControllerModelFactory.js';
+import {TextMesh} from './textmesh-standalone.esm.js'
 import {makeId, XRChannelConnection} from 'https://2.metartc.com/xrrtc.js';
-// import {initLocalRig, updatePlayerFromCamera, updatePlayerFromXr, updatePlayerFromArrays, updatePlayerDefault, getRigBoneTexture, bindChannelConnection, bindPeerConnection} from './peerconnection.js';
 import address from 'https://contracts.webaverse.com/address.js';
 import abi from 'https://contracts.webaverse.com/abi.js';
 
@@ -128,6 +122,9 @@ const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 const contract = new web3.eth.Contract(abi, address);
 
 const localVector = new THREE.Vector3();
+const localVector2 = new THREE.Vector3();
+const localQuaternion = new THREE.Quaternion();
+const localEuler = new THREE.Euler();
 const localMatrix = new THREE.Matrix4();
 
 function parseQuery(queryString) {
@@ -150,9 +147,9 @@ function makePromise() {
   return p;
 }
 
-const canvas = document.getElementById('canvas');
+// const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({
-  canvas,
+  // canvas,
   antialias: true,
   preserveDrawingBuffer: true,
 });
@@ -191,6 +188,17 @@ scene.add(directionalLight);
 const directionalLight2 = new THREE.DirectionalLight(0xFFFFFF, 3);
 directionalLight2.position.set(-0.5, 0.1, 0.5).multiplyScalar(100);
 scene.add(directionalLight2);
+
+const textMesh = new TextMesh();
+textMesh.text = 'Anonymous';
+textMesh.font = './GeosansLight.ttf';
+textMesh.fontSize = 0.2;
+// textMesh.position.set(0, 1, -2);
+textMesh.color = 0x000000;
+textMesh.anchorX = 'center';
+textMesh.frustumCulled = false;
+textMesh.sync();
+scene.add(textMesh);
 
 let rig = null;
 // let videoMediaStream = null;
@@ -274,9 +282,11 @@ const _connectMultiplayer = async roomName => {
       }
     });
 
-    const micMediaStreamTrack = await channelConnection.enableMic();
-    const micMediaStream = new MediaStream([micMediaStreamTrack]);
-    xrpackage.setMicStream(micMediaStream);
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+    await channelConnection.setMicrophoneMediaStream(mediaStream);
+    xrpackage.setMicrophoneMediaStream(mediaStream);
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {
@@ -437,8 +447,29 @@ scene.add(plane); */
 
 _connectMultiplayer('room');
 
-function animate() {
+function animate(timestamp, frame) {
   // orbitControls.update();
+
+  if (frame) {
+    const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+
+    // const vrCamera = renderer.xr.getCamera(camera);
+    textMesh.matrix
+      .fromArray(pose.transform.matrix)
+      .decompose(textMesh.position, textMesh.quaternion, textMesh.scale);
+    // textMesh.position.y = (Date.now()%1000)/1000;
+    // vrCamera.cameras[0].matrixWorld.decompose(localVector, localQuaternion, localVector2);
+    /* textMesh.position.x = localVector.x;
+    textMesh.position.y = 1;
+    textMesh.position.z = localVector.z; */
+    textMesh.position.y += 0.5;
+    // textMesh.position.add(new THREE.Vector3(0, 0, -1).applyQuaternion(localQuaternion));
+    localEuler.setFromQuaternion(textMesh.quaternion, 'YXZ');
+    localEuler.x = 0;
+    localEuler.y += Math.PI;
+    localEuler.z = 0;
+    textMesh.quaternion.setFromEuler(localEuler);
+  }
 
   // update local player
   const pose = renderer.xr.getPose();

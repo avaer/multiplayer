@@ -189,15 +189,19 @@ const directionalLight2 = new THREE.DirectionalLight(0xFFFFFF, 3);
 directionalLight2.position.set(-0.5, 0.1, 0.5).multiplyScalar(100);
 scene.add(directionalLight2);
 
-const textMesh = new TextMesh();
-textMesh.text = 'Anonymous';
-textMesh.font = './GeosansLight.ttf';
-textMesh.fontSize = 0.2;
-// textMesh.position.set(0, 1, -2);
-textMesh.color = 0x000000;
-textMesh.anchorX = 'center';
-textMesh.frustumCulled = false;
-textMesh.sync();
+const _makeTextMesh = text => {
+  const textMesh = new TextMesh();
+  textMesh.text = text;
+  textMesh.font = './GeosansLight.ttf';
+  textMesh.fontSize = 0.2;
+  // textMesh.position.set(0, 1, -2);
+  textMesh.color = 0x000000;
+  textMesh.anchorX = 'center';
+  textMesh.frustumCulled = false;
+  textMesh.sync();
+  return textMesh;
+};
+const textMesh = _makeTextMesh('Anonymous');
 scene.add(textMesh);
 
 let rig = null;
@@ -318,8 +322,9 @@ const _connectMultiplayer = async roomName => {
         await p.loadAvatar();
         if (live) {
           playerRig = p;
+          playerRig.textMesh = _makeTextMesh('Player');
+          scene.add(playerRig.textMesh);
           if (microphoneMediaStream) {
-            console.log('set old mic stream', playerRig, microphoneMediaStream);
             playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
           }
         } else {
@@ -344,6 +349,7 @@ const _connectMultiplayer = async roomName => {
       peerConnections.splice(peerConnections.indexOf(peerConnection), 1);
       if (playerRig) {
         xrpackage.remove(playerRig);
+        scene.remove(playerRig.textMesh);
         playerRig = null;
       }
       if (interval) {
@@ -359,7 +365,16 @@ const _connectMultiplayer = async roomName => {
         if (method === 'pose') {
           if (playerRig) {
             const {pose} = j;
+            const [head] = pose;
             playerRig.setPose(pose);
+            playerRig.textMesh.position.fromArray(head[0]);
+            playerRig.textMesh.position.y += 0.5;
+            playerRig.textMesh.quaternion.fromArray(head[1]);
+            localEuler.setFromQuaternion(playerRig.textMesh.quaternion, 'YXZ');
+            localEuler.x = 0;
+            localEuler.y += Math.PI;
+            localEuler.z = 0;
+            playerRig.textMesh.quaternion.setFromEuler(localEuler);
           }
         } else if (method === 'avatar') {
           const {peerId, url} = j;
@@ -450,20 +465,12 @@ _connectMultiplayer('room');
 function animate(timestamp, frame) {
   // orbitControls.update();
 
+  const pose = renderer.xr.getPose();
   if (frame) {
-    const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
-
-    // const vrCamera = renderer.xr.getCamera(camera);
     textMesh.matrix
       .fromArray(pose.transform.matrix)
       .decompose(textMesh.position, textMesh.quaternion, textMesh.scale);
-    // textMesh.position.y = (Date.now()%1000)/1000;
-    // vrCamera.cameras[0].matrixWorld.decompose(localVector, localQuaternion, localVector2);
-    /* textMesh.position.x = localVector.x;
-    textMesh.position.y = 1;
-    textMesh.position.z = localVector.z; */
     textMesh.position.y += 0.5;
-    // textMesh.position.add(new THREE.Vector3(0, 0, -1).applyQuaternion(localQuaternion));
     localEuler.setFromQuaternion(textMesh.quaternion, 'YXZ');
     localEuler.x = 0;
     localEuler.y += Math.PI;
@@ -472,7 +479,6 @@ function animate(timestamp, frame) {
   }
 
   // update local player
-  const pose = renderer.xr.getPose();
   if (pose) {
     localMatrix.fromArray(pose.transform.matrix)
       .decompose(myRig.head.position, myRig.head.quaternion, localVector);

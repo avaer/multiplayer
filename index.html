@@ -290,7 +290,7 @@ const _connectMultiplayer = async roomName => {
       audio: true,
     });
     await channelConnection.setMicrophoneMediaStream(mediaStream);
-    xrpackage.setMicrophoneMediaStream(mediaStream);
+    // xrpackage.setMicrophoneMediaStream(mediaStream);
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {

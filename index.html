@@ -410,26 +410,8 @@ const _connectMultiplayer = async roomName => {
           console.warn('unknown method', method);
         }
       } else {
-        // console.log('got non-string data', data, avatarQueued && avatarQueued.url, avatarQueued && avatarQueued.numPackets, avatarQueued && avatarQueued.packets);
-
-        /* if (avatarQueued) {
-          avatarQueued.packets.push(data);
-          if (avatarQueued.packets.length >= avatarQueued.numPackets) {
-            let size = 0;
-            for (let i = 0; i < avatarQueued.packets.length; i++) {
-              size += avatarQueued.packets[i].byteLength;
-            }
-            const uint8Array = new Uint8Array(size);
-            let index = 0;
-            for (let i = 0; i < avatarQueued.packets.length; i++) {
-              const packet = avatarQueued.packets[i];
-              uint8Array.set(new Uint8Array(packet), index);
-              index += packet.byteLength;
-            }
-            _loadAvatar(uint8Array);
-            avatarQueued = null;
-          }
-        } */
+        console.warn('non-string data', data);
+        throw new Error('non-string data');
       }
     });
     peerConnection.addEventListener('addtrack', e => {

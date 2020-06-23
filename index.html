@@ -322,7 +322,7 @@ const _connectMultiplayer = async roomName => {
         await p.loadAvatar();
         if (live) {
           playerRig = p;
-          playerRig.textMesh = _makeTextMesh('Player');
+          playerRig.textMesh = _makeTextMesh('Loading...');
           scene.add(playerRig.textMesh);
           if (microphoneMediaStream) {
             playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);

@@ -286,11 +286,18 @@ const _connectMultiplayer = async roomName => {
       }
     });
 
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
-    await channelConnection.setMicrophoneMediaStream(mediaStream);
-    // xrpackage.setMicrophoneMediaStream(mediaStream);
+    const _latchMediaStream = async () => {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      const track = mediaStream.getAudioTracks()[0];
+      track.addEventListener('ended', async e => {
+        await channelConnection.setMicrophoneMediaStream(null);
+        _latchMediaStream();
+      });
+      await channelConnection.setMicrophoneMediaStream(mediaStream);
+    };
+    _latchMediaStream();
   }, {once: true});
   channelConnection.addEventListener('close', e => {
     if (interval) {
@@ -419,14 +426,17 @@ const _connectMultiplayer = async roomName => {
       microphoneMediaStream = new MediaStream([track]);
       if (playerRig) {
         playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
+        track.addEventListener('ended', e => {
+          playerRig.context.rig.setMicrophoneMediaStream(null);
+        });
       }
     });
-    peerConnection.addEventListener('removetrack', e => {
+    /* peerConnection.addEventListener('removetrack', e => {
       const track = e.data;
       if (playerRig) {
         playerRig.context.rig.setMicrophoneMediaStream(null);
       }
-    });
+    }); */
     peerConnections.push(peerConnection);
 
     const res = await fetch('miku.vrm');

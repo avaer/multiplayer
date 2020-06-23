@@ -376,6 +376,12 @@ const _connectMultiplayer = async roomName => {
             localEuler.z = 0;
             playerRig.textMesh.quaternion.setFromEuler(localEuler);
           }
+        } else if (method === 'name') {
+          const {peerId, name} = j;
+          if (peerId === peerConnection.connectionId && playerRig && name !== playerRig.textMesh.text) {
+            playerRig.textMesh.text = name;
+            playerRig.textMesh.sync();
+          }
         } else if (method === 'avatar') {
           const {peerId, url} = j;
           // console.log('got avatar', peerId, peerConnection.connectionId, url, modelUrl);
@@ -435,6 +441,11 @@ const _connectMultiplayer = async roomName => {
     let interval;
     if (live) {
       interval = setInterval(() => {
+        channelConnection.send(JSON.stringify({
+          method: 'name',
+          peerId: channelConnection.connectionId,
+          name: 'Player One',
+        }));
         channelConnection.send(JSON.stringify({
           method: 'avatar',
           peerId: channelConnection.connectionId,

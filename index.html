@@ -344,7 +344,7 @@ const _connectMultiplayer = async roomName => {
       }
     };
 
-    peerConnections.push(peerConnection);
+    peerConnection.getPlayerRig = () => playerRig;
     peerConnection.addEventListener('close', () => {
       peerConnections.splice(peerConnections.indexOf(peerConnection), 1);
       if (playerRig) {
@@ -422,6 +422,7 @@ const _connectMultiplayer = async roomName => {
         playerRig.context.rig.setMicrophoneMediaStream(null);
       }
     });
+    peerConnections.push(peerConnection);
 
     const res = await fetch('miku.vrm');
     const b = await res.blob();
@@ -490,29 +491,40 @@ function animate(timestamp, frame) {
     myRig.rightHand.quaternion.copy(myRig.head.quaternion);
   }
 
-  // send pose to other players
-  if (channelConnectionOpen) {
-    const pose = [
-      [
-        myRig.head.position.toArray(),
-        myRig.head.quaternion.toArray(),
-      ],
-      [
-        myRig.leftHand.position.toArray(),
-        myRig.leftHand.quaternion.toArray(),
-      ],
-      [
-        myRig.rightHand.position.toArray(),
-        myRig.rightHand.quaternion.toArray(),
-      ],
-    ];
-    channelConnection.send(JSON.stringify({
-      method: 'pose',
-      pose,
-    }));
+  // update remote player rigs
+  for (const peerConnection of peerConnections) {
+    const playerRig = peerConnection.getPlayerRig();
+    if (playerRig) {
+      playerRig.rig && playerRig.rig.update();
+    }
   }
 
+  // render
   renderer.render(scene, camera);
+
+  // send pose to other players
+  setTimeout(() => {
+    if (channelConnectionOpen) {
+      const pose = [
+        [
+          myRig.head.position.toArray(),
+          myRig.head.quaternion.toArray(),
+        ],
+        [
+          myRig.leftHand.position.toArray(),
+          myRig.leftHand.quaternion.toArray(),
+        ],
+        [
+          myRig.rightHand.position.toArray(),
+          myRig.rightHand.quaternion.toArray(),
+        ],
+      ];
+      channelConnection.send(JSON.stringify({
+        method: 'pose',
+        pose,
+      }));
+    }
+  });
 }
 renderer.setAnimationLoop(animate);
 

@@ -389,7 +389,7 @@ const _connectMultiplayer = async roomName => {
             _loadAvatar(url);
           }
         } else {
-          console.warn('bad method', j);
+          console.warn('unknown method', method);
         }
       } else {
         // console.log('got non-string data', data, avatarQueued && avatarQueued.url, avatarQueued && avatarQueued.numPackets, avatarQueued && avatarQueued.packets);

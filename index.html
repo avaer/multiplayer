@@ -146,8 +146,8 @@ function makePromise() {
   p.reject = reject;
   return p;
 }
-const _getUsername = () => xrpackage.getEnv('username');
-const _getAvatar = () => xrpackage.getEnv('avatar');
+const _getUsername = () => xrpackage.getEnv('username') || 'Anonymous';
+const _getAvatar = () => xrpackage.getEnv('avatar') || null;
 
 // const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({
@@ -331,22 +331,29 @@ const _connectMultiplayer = async roomName => {
       if (!loading) {
         loading = true;
 
-        const u = `https://ipfs.exokit.org/ipfs/${hash}.wbn`;
-        const res = await fetch(u);
-        const ab = await res.arrayBuffer();
-        const uint8Array = new Uint8Array(ab);
-        const p = new XRPackage(uint8Array);
-        await xrpackage.add(p);
+        const p = await (async () => {
+          if (hash) {
+            const u = `https://ipfs.exokit.org/ipfs/${hash}.wbn`;
+            const res = await fetch(u);
+            const ab = await res.arrayBuffer();
+            const uint8Array = new Uint8Array(ab);
+            return new XRPackage(uint8Array);
+          } else {
+            return new XRPackage();
+          }
+        })();
+        await p.waitForLoad();
         await p.loadAvatar();
+        await xrpackage.add(p);
         if (live) {
           playerRig = p;
           playerRig.textMesh = _makeTextMesh('Loading...');
           scene.add(playerRig.textMesh);
           if (microphoneMediaStream) {
-            playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
+            p.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
           }
         } else {
-          xrpackage.remove(p);
+          await xrpackage.remove(p);
         }
 
         loading = false;
@@ -361,12 +368,13 @@ const _connectMultiplayer = async roomName => {
         });
       }
     };
+    _loadAvatar(null);
 
     peerConnection.getPlayerRig = () => playerRig;
-    peerConnection.addEventListener('close', () => {
+    peerConnection.addEventListener('close', async () => {
       peerConnections.splice(peerConnections.indexOf(peerConnection), 1);
       if (playerRig) {
-        xrpackage.remove(playerRig);
+        await xrpackage.remove(playerRig);
         scene.remove(playerRig.textMesh);
         playerRig = null;
       }

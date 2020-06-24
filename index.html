@@ -237,6 +237,12 @@ const _connectMultiplayer = async roomName => {
       if (!loading) {
         loading = true;
 
+        if (playerRig) {
+          await xrpackage.remove(playerRig);
+          scene.remove(playerRig.textMesh);
+          playerRig = null;
+        }
+
         const p = await (async () => {
           if (hash) {
             const u = `https://ipfs.exokit.org/ipfs/${hash}.wbn`;

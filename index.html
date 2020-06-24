@@ -380,19 +380,26 @@ const _connectMultiplayer = async roomName => {
     }, 1000);
   }); */
 
-  console.log('wait for init state', channelConnection.dialogClient._protoo);
+  let state = {};
   channelConnection.addEventListener('initState', e => {
     const {data} = e;
-    const {state} = data;
+    state = data.state;
     console.log('got init state', state);
   });
   channelConnection.addEventListener('updateState', e => {
     const {data} = e;
-    console.log('got update state', data);
+    const {key, value} = data;
+    console.log('got update state', key, value);
+    state[key] = value;
   });
-  setInterval(() => {
-    channelConnection.setState('lol', 'zol-' + Math.random());
-  }, 1000);
+  xrpackage.addEventListener('packageadd', e => {
+    const {data: {package: p, reason}} = e
+    console.log('got package add', p, reason);
+  });
+  xrpackage.addEventListener('packageremove', e => {
+    const {data: {package: p, reason}} = e
+    console.log('got package remove', p, reason);
+  });
 };
 
 _connectMultiplayer('room');

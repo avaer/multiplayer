@@ -396,6 +396,7 @@ const _connectMultiplayer = async roomName => {
       const value = state[key];
       const id = parseInt(key, 10);
       const p = await XRPackage.download(value.hash);
+      p.id = id;
       p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
       await xrpackage.add(p);
     }
@@ -415,6 +416,7 @@ const _connectMultiplayer = async roomName => {
     let p = xrpackage.children.find(p => p.id === id);
     if (isSet && !p) {
       p = await XRPackage.download(value.hash);
+      p.id = id;
       await xrpackage.add(p);
     } else if (!isSet && p) {
       await xrpackage.remove(p);

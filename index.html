@@ -383,7 +383,8 @@ const _connectMultiplayer = async roomName => {
   console.log('wait for init state', channelConnection.dialogClient._protoo);
   channelConnection.addEventListener('initState', e => {
     const {data} = e;
-    console.log('got init state', data);
+    const {state} = data;
+    console.log('got init state', state);
   });
   channelConnection.addEventListener('updateState', e => {
     const {data} = e;

@@ -392,13 +392,21 @@ const _connectMultiplayer = async roomName => {
     console.log('got update state', key, value);
     state[key] = value;
   });
-  xrpackage.addEventListener('packageadd', e => {
+  xrpackage.addEventListener('packageadd', async e => {
     const {data: {package: p, reason}} = e
     console.log('got package add', p, reason);
+    const hash = await p.getHash();
+    channelConnection.setState(p.id, {
+      id: p.id,
+      hash,
+      // matrix: p.matrix.toArray(),
+    });
   });
-  xrpackage.addEventListener('packageremove', e => {
+  xrpackage.addEventListener('packageremove', async e => {
     const {data: {package: p, reason}} = e
     console.log('got package remove', p, reason);
+    const hash = await p.getHash();
+    channelConnection.deleteState(p.id);
   });
 };
 

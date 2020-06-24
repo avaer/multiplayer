@@ -256,6 +256,7 @@ const _connectMultiplayer = async roomName => {
         })();
         await p.waitForLoad();
         await p.loadAvatar();
+        p.isAvatar = true;
         await xrpackage.add(p);
         if (live) {
           playerRig = p;
@@ -387,32 +388,69 @@ const _connectMultiplayer = async roomName => {
   }); */
 
   let state = {};
-  channelConnection.addEventListener('initState', e => {
+  channelConnection.addEventListener('initState', async e => {
     const {data} = e;
     state = data.state;
     console.log('got init state', state);
+    for (const key in state) {
+      const value = state[key];
+      const id = parseInt(key, 10);
+      const p = await XRPackage.download(value.hash);
+      p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
+      await xrpackage.add(p);
+    }
   });
-  channelConnection.addEventListener('updateState', e => {
+  channelConnection.addEventListener('updateState', async e => {
     const {data} = e;
     const {key, value} = data;
     console.log('got update state', key, value);
-    state[key] = value;
+    if (value !== undefined) {
+      state[key] = value;
+    } else {
+      delete state[key];
+    }
+
+    const id = parseInt(key, 10);
+    let p = xrpackage.children.find(p => p.id === id);
+    if (!p) {
+      p = await XRPackage.download(value.hash);
+      await xrpackage.add(p);
+    }
+    p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
   });
+
   xrpackage.addEventListener('packageadd', async e => {
     const {data: {package: p, reason}} = e
-    console.log('got package add', p, reason);
+    console.log('got package add', p, reason, new Error().stack);
+    if (!p.isAvatar && state[p.id] === undefined) {
+      const hash = await p.getHash();
+      channelConnection.setState(p.id, {
+        id: p.id,
+        hash,
+        matrix: p.matrix.toArray(),
+      });
+    }
+  });
+  xrpackage.addEventListener('packageremove', async e => {
+    const {data: {package: p, reason}} = e
+    // console.log('got package remove', p, reason);
+    if (!p.isAvatar && state[p.id] !== undefined) {
+      delete state[p.id];
+
+      const hash = await p.getHash();
+      channelConnection.deleteState(p.id);
+    }
+  });
+  xrpackage.addEventListener('matrixupdate', async e => {
+    const {data: {package: p, matrix}} = e
+    // console.log('got package remove', p, reason);
+    matrix.toArray(state[id].matrix);
     const hash = await p.getHash();
     channelConnection.setState(p.id, {
       id: p.id,
       hash,
-      // matrix: p.matrix.toArray(),
+      matrix: matrix.toArray(),
     });
-  });
-  xrpackage.addEventListener('packageremove', async e => {
-    const {data: {package: p, reason}} = e
-    console.log('got package remove', p, reason);
-    const hash = await p.getHash();
-    channelConnection.deleteState(p.id);
   });
 };
 

@@ -404,7 +404,8 @@ const _connectMultiplayer = async roomName => {
     const {data} = e;
     const {key, value} = data;
     console.log('got update state', key, value);
-    if (value !== undefined) {
+    const isSet = value !== undefined;
+    if (isSet) {
       state[key] = value;
     } else {
       delete state[key];
@@ -412,30 +413,37 @@ const _connectMultiplayer = async roomName => {
 
     const id = parseInt(key, 10);
     let p = xrpackage.children.find(p => p.id === id);
-    if (!p) {
+    if (isSet && !p) {
       p = await XRPackage.download(value.hash);
       await xrpackage.add(p);
+    } else if (!isSet && p) {
+      await xrpackage.remove(p);
+      p = null;
     }
-    p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
+    p && p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
   });
 
   xrpackage.addEventListener('packageadd', async e => {
     const {data: {package: p, reason}} = e
-    console.log('got package add', p, reason, new Error().stack);
+    console.log('got package add', p, reason, !p.isAvatar && state[p.id] === undefined, new Error().stack);
     if (!p.isAvatar && state[p.id] === undefined) {
       const hash = await p.getHash();
-      channelConnection.setState(p.id, {
+      const value = {
         id: p.id,
         hash,
         matrix: p.matrix.toArray(),
-      });
+      };
+      state[p.id] = value;
+      channelConnection.setState(p.id, value);
     }
   });
   xrpackage.addEventListener('packageremove', async e => {
     const {data: {package: p, reason}} = e
-    // console.log('got package remove', p, reason);
+    console.log('got package remove', p, reason, state);
     if (!p.isAvatar && state[p.id] !== undefined) {
       delete state[p.id];
+
+      console.log('delete state', p);
 
       const hash = await p.getHash();
       channelConnection.deleteState(p.id);
@@ -443,7 +451,7 @@ const _connectMultiplayer = async roomName => {
   });
   xrpackage.addEventListener('matrixupdate', async e => {
     const {data: {package: p, matrix}} = e
-    // console.log('got package remove', p, reason);
+    console.log('got matrix update', p, reason);
     matrix.toArray(state[id].matrix);
     const hash = await p.getHash();
     channelConnection.setState(p.id, {

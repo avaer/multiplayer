@@ -469,29 +469,44 @@ _connectMultiplayer('room');
 function animate(timestamp, frame) {
   // orbitControls.update();
 
-  const pose = renderer.xr.getPose();
+  
+  const session = renderer.xr.getSession();
   if (frame) {
-    textMesh.matrix
-      .fromArray(pose.transform.matrix)
-      .decompose(textMesh.position, textMesh.quaternion, textMesh.scale);
-    textMesh.position.y += 0.5;
-    localEuler.setFromQuaternion(textMesh.quaternion, 'YXZ');
-    localEuler.x = 0;
-    localEuler.y += Math.PI;
-    localEuler.z = 0;
-    textMesh.quaternion.setFromEuler(localEuler);
-  }
+    const pose = renderer.xr.getPose();
+    const inputSources = Array.from(session.inputSources);
+    const referenceSpace = renderer.xr.getReferenceSpace();
 
-  // update local player
-  if (pose) {
-    localMatrix.fromArray(pose.transform.matrix)
-      .decompose(myRig.head.position, myRig.head.quaternion, localVector);
-    /* myRig.head.position.copy(camera.position);
-    myRig.head.quaternion.copy(camera.quaternion); */
-    myRig.leftHand.position.copy(myRig.head.position).add(new THREE.Vector3(-0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
-    myRig.leftHand.quaternion.copy(myRig.head.quaternion);
-    myRig.rightHand.position.copy(myRig.head.position).add(new THREE.Vector3(0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
-    myRig.rightHand.quaternion.copy(myRig.head.quaternion);
+    const _loadHmd = () => {
+      localMatrix.fromArray(pose.transform.matrix)
+        .decompose(myRig.head.position, myRig.head.quaternion, localVector);
+
+      textMesh.matrix
+        .fromArray(pose.transform.matrix)
+        .decompose(textMesh.position, textMesh.quaternion, textMesh.scale);
+      textMesh.position.y += 0.5;
+      localEuler.setFromQuaternion(textMesh.quaternion, 'YXZ');
+      localEuler.x = 0;
+      localEuler.y += Math.PI;
+      localEuler.z = 0;
+      textMesh.quaternion.setFromEuler(localEuler);
+    };
+    _loadHmd();
+
+    const _loadGamepad = i => {
+      const inputSource = inputSources[i];
+      const rigHand = i === 0 ? myRig.leftHand : myRig.rightHand;
+
+      let pose, gamepad;
+      if (inputSource && (pose = frame.getPose(inputSource.targetRaySpace, referenceSpace)) && (gamepad = inputSource.gamepad)) {
+        localMatrix.fromArray(pose.transform.matrix)
+          .decompose(rigHand.position, rigHand.quaternion, localVector2);
+      } else {
+        rigHand.position.copy(myRig.head.position).add(new THREE.Vector3((i === 0 ? -1 : 1) * -0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
+        rigHand.quaternion.copy(myRig.head.quaternion);
+      }
+    };
+    _loadGamepad(0);
+    _loadGamepad(1);
   }
 
   // update remote player rigs

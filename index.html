@@ -520,7 +520,7 @@ function animate(timestamp, frame) {
   renderer.render(scene, camera);
 
   // send pose to other players
-  setTimeout(() => {
+  // setTimeout(() => {
     if (channelConnectionOpen) {
       const pose = [
         [
@@ -541,7 +541,7 @@ function animate(timestamp, frame) {
         pose,
       }));
     }
-  });
+  // });
 }
 renderer.setAnimationLoop(animate);
 

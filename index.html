@@ -493,14 +493,14 @@ function animate(timestamp, frame) {
 
     const _loadGamepad = i => {
       const inputSource = inputSources[i];
-      const rigHand = i === 1 ? myRig.leftHand : myRig.rightHand;
+      const rigHand = i === 0 ? myRig.leftHand : myRig.rightHand;
 
       let pose, gamepad;
       if (inputSource && (pose = frame.getPose(inputSource.targetRaySpace, referenceSpace)) && (gamepad = inputSource.gamepad)) {
         localMatrix.fromArray(pose.transform.matrix)
           .decompose(rigHand.position, rigHand.quaternion, localVector2);
       } else {
-        rigHand.position.copy(myRig.head.position).add(new THREE.Vector3((i === 0 ? -1 : 1) * -0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
+        rigHand.position.copy(myRig.head.position).add(new THREE.Vector3((i === 0 ? 1 : -1) * -0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
         rigHand.quaternion.copy(myRig.head.quaternion);
       }
     };

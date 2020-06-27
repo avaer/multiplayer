@@ -144,14 +144,14 @@ const _removeRig = rig => {
   scene.remove(rig.leftHand);
   scene.remove(rig.rightHand);
 };
-const _updateRig = (rig, head, leftHand, rightHand) => {
+/* const _updateRig = (rig, head, leftHand, rightHand) => {
   rig.head.position.fromArray(head.position);
   rig.head.quaternion.fromArray(head.quaternion);
   rig.leftHand.position.fromArray(leftHand.position);
   rig.leftHand.quaternion.fromArray(leftHand.quaternion);
   rig.rightHand.position.fromArray(rightHand.position);
   rig.rightHand.quaternion.fromArray(rightHand.quaternion);
-};
+}; */
 const myRig = _makeRig();
 _addRig(myRig);
 

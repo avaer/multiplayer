@@ -349,21 +349,7 @@ const _connectMultiplayer = async roomName => {
         });
       }
     });
-    /* peerConnection.addEventListener('removetrack', e => {
-      const track = e.data;
-      if (playerRig) {
-        playerRig.context.rig.setMicrophoneMediaStream(null);
-      }
-    }); */
     peerConnections.push(peerConnection);
-
-    /* const res = await fetch('miku.vrm');
-    const b = await res.blob();
-    b.name = 'model.vrm';
-    const uint8Array = await XRPackage.compileFromFile(b);
-    const p = new XRPackage(uint8Array);
-    const hash = await p.upload();
-    // console.log('got hash', hash); */
 
     let interval;
     if (live) {

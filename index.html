@@ -338,10 +338,14 @@ const _connectMultiplayer = async roomName => {
     peerConnection.addEventListener('addtrack', e => {
       const track = e.data;
       microphoneMediaStream = new MediaStream([track]);
+      const audio = document.createElement('audio');
+      audio.srcObject = microphoneMediaStream;
+      audio.play();
       if (playerRig) {
         playerRig.context.rig.setMicrophoneMediaStream(microphoneMediaStream);
         track.addEventListener('ended', e => {
           playerRig.context.rig.setMicrophoneMediaStream(null);
+          audio.srcObject = null;
         });
       }
     });

@@ -127,7 +127,11 @@ let currentSession = null;
 const _makeRig = () => {
   const head = new THREE.Mesh(new THREE.BoxBufferGeometry(0.1, 0.05, 0.2), new THREE.MeshPhongMaterial({color: 0xef5350}));
   const leftHand = new THREE.Mesh(new THREE.BoxBufferGeometry(0.05, 0.01, 0.1), new THREE.MeshPhongMaterial({color: 0x66bb6a}));
+  leftHand.pointer = 0;
+  leftHand.grip = 0;
   const rightHand = new THREE.Mesh(new THREE.BoxBufferGeometry(0.05, 0.01, 0.1), new THREE.MeshPhongMaterial({color: 0x42a5f5}));
+  rightHand.pointer = 0;
+  rightHand.grip = 0;
   return {
     head,
     leftHand,
@@ -489,9 +493,13 @@ function animate(timestamp, frame) {
       if (inputSource && (pose = frame.getPose(inputSource.targetRaySpace, referenceSpace)) && (gamepad = inputSource.gamepad)) {
         localMatrix.fromArray(pose.transform.matrix)
           .decompose(rigHand.position, rigHand.quaternion, localVector2);
+        rigHand.pointer = gamepad.buttons[0].value;
+        rigHand.grip = gamepad.buttons[1].value;
       } else {
         rigHand.position.copy(myRig.head.position).add(new THREE.Vector3((i === 0 ? 1 : -1) * -0.2, -0.2, -0.3).applyQuaternion(myRig.head.quaternion));
         rigHand.quaternion.copy(myRig.head.quaternion);
+        rigHand.pointer = 0;
+        rigHand.grip = 0;
       }
     };
     _loadGamepad(0);
@@ -520,10 +528,14 @@ function animate(timestamp, frame) {
         [
           myRig.leftHand.position.toArray(),
           myRig.leftHand.quaternion.toArray(),
+          myRig.leftHand.pointer,
+          myRig.leftHand.grip,
         ],
         [
           myRig.rightHand.position.toArray(),
           myRig.rightHand.quaternion.toArray(),
+          myRig.rightHand.pointer,
+          myRig.rightHand.grip,
         ],
       ];
       channelConnection.send(JSON.stringify({

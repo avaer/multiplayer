@@ -526,8 +526,8 @@ function animate(timestamp, frame) {
         rigHand.grip = gamepad.buttons[1].value;
       } else {
         localVector.copy(i === 0 ? leftHandOffset : rightHandOffset);
-        const handOffsetScale = 1//_getAvatarHeight()/1.5;
-        localVector.z *= handOffsetScale;
+        /* const handOffsetScale = 1//_getAvatarHeight()/1.5;
+        localVector.z *= handOffsetScale; */
         localVector.applyQuaternion(myRig.head.quaternion);
         rigHand.position.copy(myRig.head.position).add(localVector);
         rigHand.quaternion.copy(myRig.head.quaternion);

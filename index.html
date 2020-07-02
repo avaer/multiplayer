@@ -304,9 +304,8 @@ const _connectMultiplayer = async roomName => {
     };
     _loadAvatar(null);
     
-    const remoteRig = _makeRig();
-    // console.log('remote rig', remoteRig);
-    _addRig(remoteRig);
+    /* const remoteRig = _makeRig();
+    _addRig(remoteRig); */
 
     peerConnection.getPlayerRig = () => playerRig;
     peerConnection.addEventListener('close', async () => {
@@ -332,13 +331,14 @@ const _connectMultiplayer = async roomName => {
             const {pose} = j;
             const [head, leftGamepad, rightGamepad] = pose;
             
-            remoteRig.head.position.fromArray(head[0]);
+            /* remoteRig.head.position.fromArray(head[0]);
             remoteRig.head.quaternion.fromArray(head[1]);
             remoteRig.leftHand.position.fromArray(leftGamepad[0]);
             remoteRig.leftHand.quaternion.fromArray(leftGamepad[1]);
             remoteRig.rightHand.position.fromArray(rightGamepad[0]);
-            remoteRig.rightHand.quaternion.fromArray(rightGamepad[1]);
-            
+            remoteRig.rightHand.quaternion.fromArray(rightGamepad[1]); */
+
+            playerRig.setPose(pose);
             playerRig.textMesh.position.fromArray(head[0]);
             playerRig.textMesh.position.y += 0.5;
             playerRig.textMesh.quaternion.fromArray(head[1]);
@@ -347,19 +347,6 @@ const _connectMultiplayer = async roomName => {
             localEuler.y += Math.PI;
             localEuler.z = 0;
             playerRig.textMesh.quaternion.setFromEuler(localEuler);
-              
-            
-            /* head[0][0] /= scale;
-            head[0][1] /= scale;
-            head[0][2] /= scale;
-            leftGamepad[0][0] /= scale;
-            leftGamepad[0][1] /= scale;
-            leftGamepad[0][2] /= scale;
-            rightGamepad[0][0] /= scale;
-            rightGamepad[0][1] /= scale;
-            rightGamepad[0][2] /= scale; */
-            // playerRig.context.rig.inputs.hmd.scaleFactor = 1/s;
-            playerRig.setPose(pose);
           }
         } else if (method === 'name') {
           const {peerId, name} = j;
@@ -527,8 +514,6 @@ function animate(timestamp, frame) {
     };
     _loadHmd();
 
-    // console.log('avatar height', _getAvatarHeight()); // 0.8871427127
-
     const _loadGamepad = i => {
       const inputSource = inputSources[i];
       const rigHand = i === 0 ? myRig.leftHand : myRig.rightHand;
@@ -569,44 +554,11 @@ function animate(timestamp, frame) {
   // setTimeout(() => {
     if (channelConnectionOpen) {
       const scaleFactor = _getHeightFactor(_getAvatarHeight());
-      
-      /* localMatrix.fromArray(this.xrState.poseMatrix)
-        .decompose(localVector, localQuaternion, localVector2);
-      localVector.multiplyScalar(this.scale);
-      if (rig) {
-        rig.inputs.hmd.position.copy(localVector);
-        rig.inputs.hmd.quaternion.copy(localQuaternion);
-        localMatrix2.getInverse(this.matrix);
-        localMatrix
-          .compose(localVector.fromArray(xrState.gamepads[1].position), localQuaternion.fromArray(xrState.gamepads[1].orientation), localVector2.set(1, 1, 1))
-          .premultiply(localMatrix2)
-          .decompose(rig.inputs.leftGamepad.position, rig.inputs.leftGamepad.quaternion, localVector2); */
 
-      // console.log('get avatar heights', _getAvatarHeight(), userHeight, xrpackage.engine.scale);
-
-      localMatrix.compose(myRig.head.position, myRig.head.quaternion, localVector2.set(1, 1, 1))
-      /* console.log('position inner 1', myRig.head.position.toArray());
-      localMatrix */
-        // .premultiply(localMatrix2.getInverse(xrpackage.package.matrixWorld))
-        // .premultiply(xrpackage.package.matrixWorld)
-        .decompose(myRig.head.position, myRig.head.quaternion, localVector2);
-      // myRig.head.position.multiplyScalar(userHeight);
-      console.log('position inner', myRig.head.position.toArray());
-
-      localMatrix.compose(myRig.leftHand.position, myRig.leftHand.quaternion, localVector2.set(1, 1, 1))
-        // .premultiply(localMatrix2.getInverse(xrpackage.package.matrixWorld))
-        // .premultiply(xrpackage.package.matrixWorld)
-        .decompose(myRig.leftHand.position, myRig.leftHand.quaternion, localVector2);
-
-      localMatrix.compose(myRig.rightHand.position, myRig.rightHand.quaternion, localVector2.set(1, 1, 1))
-        // .premultiply(localMatrix2.getInverse(xrpackage.package.matrixWorld))
-        // .premultiply(xrpackage.package.matrixWorld)
-        .decompose(myRig.rightHand.position, myRig.rightHand.quaternion, localVector2);
       const pose = [
         [
           myRig.head.position.toArray(),
           myRig.head.quaternion.toArray(),
-          // 1/xrpackage.engine.scale,
         ],
         [
           myRig.leftHand.position.toArray(),

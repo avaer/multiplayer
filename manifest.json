@@ -2,5 +2,8 @@
   "name": "Multiplayer",
   "description": "Multiplayer Avatars XRPackage",
   "xr_type": "webxr-site@0.0.1",
+  "xr_details": {
+    "transform": false
+  },
   "start_url": "index.html"
 }

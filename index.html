@@ -595,12 +595,12 @@ function animate(timestamp, frame) {
 
       localMatrix.compose(myRig.leftHand.position, myRig.leftHand.quaternion, localVector2.set(1, 1, 1))
         // .premultiply(localMatrix2.getInverse(xrpackage.package.matrixWorld))
-        .premultiply(xrpackage.package.matrixWorld)
+        // .premultiply(xrpackage.package.matrixWorld)
         .decompose(myRig.leftHand.position, myRig.leftHand.quaternion, localVector2);
 
       localMatrix.compose(myRig.rightHand.position, myRig.rightHand.quaternion, localVector2.set(1, 1, 1))
         // .premultiply(localMatrix2.getInverse(xrpackage.package.matrixWorld))
-        .premultiply(xrpackage.package.matrixWorld)
+        // .premultiply(xrpackage.package.matrixWorld)
         .decompose(myRig.rightHand.position, myRig.rightHand.quaternion, localVector2);
       const pose = [
         [

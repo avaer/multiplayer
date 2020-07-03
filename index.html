@@ -142,6 +142,11 @@ const _makeRig = () => {
   const rightHand = new THREE.Mesh(new THREE.BoxBufferGeometry(0.05, 0.01, 0.1), new THREE.MeshPhongMaterial({color: 0x42a5f5}));
   rightHand.pointer = 0;
   rightHand.grip = 0;
+  
+  head.visible = false;
+  leftHand.visible = false;
+  rightHand.visible = false;
+
   return {
     head,
     leftHand,

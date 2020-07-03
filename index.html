@@ -445,7 +445,11 @@ const _connectMultiplayer = async roomName => {
       await xrpackage.remove(p);
       p = null;
     }
-    p && p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
+    if(p) {
+      state[p.id].ignoreMatrixUpdate = true
+      p.setMatrix(new THREE.Matrix4().fromArray(value.matrix));
+      state[p.id].ignoreMatrixUpdate = false
+    }
   });
 
   xrpackage.addEventListener('packageadd', async e => {
@@ -461,6 +465,19 @@ const _connectMultiplayer = async roomName => {
       state[p.id] = value;
       channelConnection.setState(p.id, value);
     }
+
+    let pk = xrpackage.children.find(pa => pa.id === p.id);
+    pk.addEventListener('matrixupdate', async e => {
+      const matrix = e.data
+      if (!state[pk.id].ignoreMatrixUpdate) {
+        const hash = await pk.getHash();
+        channelConnection.setState(p.id, {
+          id: p.id,
+          hash,
+          matrix: matrix.toArray(),
+        });
+      }
+    });
   });
   xrpackage.addEventListener('packageremove', async e => {
     const {data: {package: p, reason}} = e
@@ -473,17 +490,6 @@ const _connectMultiplayer = async roomName => {
       const hash = await p.getHash();
       channelConnection.deleteState(p.id);
     }
-  });
-  xrpackage.addEventListener('matrixupdate', async e => {
-    const {data: {package: p, matrix}} = e
-    console.log('got matrix update', p, reason);
-    matrix.toArray(state[id].matrix);
-    const hash = await p.getHash();
-    channelConnection.setState(p.id, {
-      id: p.id,
-      hash,
-      matrix: matrix.toArray(),
-    });
   });
 };
 

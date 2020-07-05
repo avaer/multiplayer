@@ -466,7 +466,7 @@ const _connectMultiplayer = async roomName => {
       channelConnection.setState(p.id, value);
     }
 
-    p.onMatrixUpdate = (async (e) => {
+    p.onMatrixUpdate = async (e) => {
       const matrix = e.data
       const hash = await p.getHash();
       channelConnection.setState(p.id, {
@@ -474,7 +474,7 @@ const _connectMultiplayer = async roomName => {
         hash,
         matrix: matrix.toArray(),
       });
-    });
+    };
     p.addEventListener('matrixupdate', p.onMatrixUpdate);
   });
   xrpackage.addEventListener('packageremove', async e => {

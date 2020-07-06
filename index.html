@@ -479,6 +479,8 @@ const _connectMultiplayer = async roomName => {
       const hash = await p.getHash();
       channelConnection.deleteState(p.id);
     }
+    
+    removeMatrixUpdateListener(p);
   });
 };
 
@@ -599,8 +601,10 @@ navigator.xr.addEventListener('sessiongranted', e => {
   }).then(onSessionStarted);
 });
 
-const matrixUpdateListeners = {}
+const matrixUpdateListeners = {};
 function addMatrixUpdateListener(p) {
+  removeMatrixUpdateListener(p);
+
   const listener = (async function (e) {
     const matrix = e.data
     const hash = await this.getHash();
@@ -611,13 +615,13 @@ function addMatrixUpdateListener(p) {
     });
   }).bind(p);
 
-  matrixUpdateListeners[p.id] = listener
-  p.addEventListener('matrixupdate', listener)
+  matrixUpdateListeners[p.id] = listener;
+  p.addEventListener('matrixupdate', listener);
 }
 
 function removeMatrixUpdateListener(p) {
   if (matrixUpdateListeners[p.id]) {
-    p.removeEventListener("matrixupdate", matrixUpdateListeners[p.id])
+    p.removeEventListener("matrixupdate", matrixUpdateListeners[p.id]);
   }
 }
 

@@ -599,7 +599,7 @@ navigator.xr.addEventListener('sessiongranted', e => {
   }).then(onSessionStarted);
 });
 
-const listeners = {}
+const matrixUpdateListeners = {}
 function addMatrixUpdateListener(p) {
   const listener = (async function (e) {
     const matrix = e.data
@@ -611,13 +611,13 @@ function addMatrixUpdateListener(p) {
     });
   }).bind(p);
 
-  listeners[p.id] = listener
+  matrixUpdateListeners[p.id] = listener
   p.addEventListener('matrixupdate', listener)
 }
 
 function removeMatrixUpdateListener(p) {
-  if (listeners[p.id]) {
-    p.removeEventListener("matrixupdate", listeners[p.id])
+  if (matrixUpdateListeners[p.id]) {
+    p.removeEventListener("matrixupdate", matrixUpdateListeners[p.id])
   }
 }
 

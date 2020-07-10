@@ -603,8 +603,6 @@ navigator.xr.addEventListener('sessiongranted', e => {
 
 const matrixUpdateListeners = {};
 function addMatrixUpdateListener(p) {
-  removeMatrixUpdateListener(p);
-
   const listener = async function (e) {
     const matrix = e.data
     const hash = await p.getHash();
